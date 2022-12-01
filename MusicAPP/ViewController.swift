@@ -9,36 +9,18 @@ import UIKit
 
 class ViewController: UIViewController {
     
+    let searchController = UISearchController(searchResultsController: nil)
     let networkService = NetworkService()
+    var searchResponse: SearchResponse? = nil
+    private var timer: Timer?
 
     @IBOutlet weak var tableView: UITableView!
-    
-    let searchController = UISearchController(searchResultsController: nil)
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setupTableView()
         setupSearchBar()
-        
-        let urlString = "https://itunes.apple.com/search?term=jack+johnson&limit=5"
-        
-//        request(urlString: urlString) { searchResponse, error in
-//            searchResponse?.results.map({ (track) in
-//                print(track.trackName)
-//            })
-//        }
-        
-        networkService.request(urlString: urlString) { (result) in
-            switch result {
-            case .success(let searchResponse):
-                searchResponse.results.map { (track) in
-                    print("track.trackName:", track.trackName)
-                }
-            case .failure(let error):
-                print("error:", error)
-            }
-        }
     }
     
     private func setupSearchBar() {
@@ -49,7 +31,6 @@ class ViewController: UIViewController {
     }
     
     private func setupTableView() {
-        tableView.delegate = self
         tableView.dataSource = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
     }
@@ -58,24 +39,35 @@ class ViewController: UIViewController {
 
 extension ViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        3
+        (searchResponse?.results.count) ?? 0
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        cell.textLabel?.text = "123"
+        let track = searchResponse?.results[indexPath.row]
+        cell.textLabel?.text = track?.trackName
+        print("photo", track?.artworkUrl60)
         return cell
     }
     
     
 }
 
-extension ViewController: UITableViewDelegate {
-    
-}
-
 extension ViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-        print(searchText)
+        let urlString = "https://itunes.apple.com/search?term=\(searchText)&limit=5"
+        
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false, block: { (_) in
+            self.networkService.request(urlString: urlString) { [weak self] (result) in
+                switch result {
+                case .success(let searchResponse):
+                    self?.searchResponse = searchResponse
+                    self?.tableView.reloadData()
+                case .failure(let error):
+                    print("error:", error)
+                }
+            }
+        })
     }
 }
